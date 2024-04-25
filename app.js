@@ -25,7 +25,7 @@ connectDB();
 
 mongoose.connection.once("open", () => {
   console.log("Connection to database has been established successfully");
-  app.listen(PORT, process.env.HOST || null, () =>
+  app.listen(PORT, () =>
     console.log(`Server running on port: ${PORT}`)
   );
 });
