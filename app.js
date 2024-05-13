@@ -6,7 +6,7 @@ import storyRoutes from "./routes/stories.js";
 import userRoutes from "./routes/user.js";
 import commentRoutes from "./routes/comments.js"
 import dotenv from "dotenv";
-import corsOptions from "./config/corsOptions.js";
+//import corsOptions from "./config/corsOptions.js";
 import connectDB from "./config/dbConnection.js";
 
 const app = express();
