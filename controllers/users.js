@@ -18,7 +18,7 @@ const signin = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { email: oldUser.email, id: oldUser._id },
+      { email: oldUser.email, uid: oldUser._id },
       process.env.JWT_SECRET,
       {
         expiresIn: "1h",
@@ -53,7 +53,7 @@ const signup = async (req, res) => {
     });
 
     const token = jwt.sign(
-      { email: result.email, id: result._id },
+      { email: result.email, uid: result._id },
       process.env.JWT_SECRET,
       {
         expiresIn: "1h",

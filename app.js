@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import cors from "cors";
 import storyRoutes from "./routes/stories.js";
 import userRoutes from "./routes/user.js";
+import commentRoutes from "./routes/comments.js"
 import dotenv from "dotenv";
 import corsOptions from "./config/corsOptions.js";
 import connectDB from "./config/dbConnection.js";
@@ -16,10 +17,11 @@ const PORT = process.env.PORT || 5001;
 app.use(bodyParser.json({ limit: "32mb", extended: true }));
 app.use(bodyParser.urlencoded({ limit: "32mb", extended: true }));
 
-app.use(cors(corsOptions));
+app.use(cors('*'));
 
 app.use("/stories", storyRoutes);
 app.use("/user", userRoutes);
+app.use("/comments", commentRoutes);
 
 connectDB();
 

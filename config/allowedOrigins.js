@@ -2,6 +2,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const allowedOrigins = [process.env.ORIGIN];
+const allowedOrigins = ['*'];
 
 export default allowedOrigins;
