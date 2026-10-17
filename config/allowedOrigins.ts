@@ -2,6 +2,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const allowedOrigins = ['*'];
+const allowedOrigins: string[] = ["*"];
 
 export default allowedOrigins;

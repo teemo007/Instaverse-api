@@ -3,8 +3,30 @@ import jwt from "jsonwebtoken";
 
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
+export interface UploadAuthorization {
+  token: string;
+  expire: number;
+  fields: Record<string, string>;
+}
+
+export interface StoryImageInput {
+  image?: unknown;
+  imageFileId?: unknown;
+  imageWidth?: unknown;
+  imageHeight?: unknown;
+}
+
+export interface StoryImageMetadata {
+  image: string;
+  imageFileId?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+}
+
 export class ImageKitError extends Error {
-  constructor(message, status = 400) {
+  status: number;
+
+  constructor(message: string, status = 400) {
     super(message);
     this.status = status;
   }
@@ -25,17 +47,40 @@ const getConfig = () => {
   return { publicKey, privateKey, urlEndpoint };
 };
 
-const imageFolder = (userId) => `/instaverse/stories/${userId}`;
+const imageFolder = (userId: string) => `/instaverse/stories/${userId}`;
 
-export const createUploadAuthorization = (userId, input) => {
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+interface ProviderFile extends Record<string, unknown> {
+  fileId: string;
+  filePath: string;
+  fileType: string;
+  name: string;
+  size: number;
+  width: number;
+  height: number;
+}
+
+const isProviderFile = (value: unknown): value is ProviderFile =>
+  isRecord(value) &&
+  typeof value.fileId === "string" &&
+  typeof value.filePath === "string" &&
+  typeof value.fileType === "string" &&
+  typeof value.name === "string" &&
+  typeof value.size === "number" &&
+  typeof value.width === "number" &&
+  typeof value.height === "number";
+
+export const createUploadAuthorization = (userId: string, input: unknown): UploadAuthorization => {
   const { publicKey, privateKey } = getConfig();
-  const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/avif": "avif" };
-  if (!input || !Object.hasOwn(extensions, input.type) || !Number.isInteger(input.size) || input.size <= 0 || input.size > MAX_IMAGE_SIZE) {
+  const extensions: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/avif": "avif" };
+  if (!isRecord(input) || typeof input.type !== "string" || !Object.hasOwn(extensions, input.type) || !Number.isInteger(input.size) || (input.size as number) <= 0 || (input.size as number) > MAX_IMAGE_SIZE) {
     throw new ImageKitError("Choose a JPEG, PNG, WebP, GIF or AVIF image up to 5 MB.");
   }
   // V2 verifies these exact form fields, including folder, type and overwrite restrictions.
   const fields = {
-    fileName: `${randomUUID()}.${extensions[input.type]}`,
+    fileName: `${randomUUID()}.${extensions[input.type] as string}`,
     folder: imageFolder(userId),
     useUniqueFileName: "true",
     overwriteFile: "false",
@@ -49,7 +94,11 @@ export const createUploadAuthorization = (userId, input) => {
   return { token, expire: issuedAt + 300, fields };
 };
 
-export const resolveStoryImage = async (input, userId, currentStory) => {
+export const resolveStoryImage = async (
+  input: StoryImageInput,
+  userId: string,
+  currentStory?: StoryImageMetadata,
+): Promise<StoryImageMetadata> => {
   // Caption-only edits must work for existing Base64 images and during provider outages.
   if (currentStory && (input.image === undefined || input.image === currentStory.image)) {
     return {
@@ -80,10 +129,13 @@ export const resolveStoryImage = async (input, userId, currentStory) => {
       response.status === 404 ? 400 : 502,
     );
   }
-  let file;
+  let file: unknown;
   try {
     file = await response.json();
   } catch {
+    throw new ImageKitError("Invalid response from the image provider. Please try again.", 502);
+  }
+  if (!isProviderFile(file)) {
     throw new ImageKitError("Invalid response from the image provider. Please try again.", 502);
   }
   if (typeof file.filePath !== "string" || !file.filePath.startsWith(`${imageFolder(userId)}/`)) {
@@ -91,7 +143,7 @@ export const resolveStoryImage = async (input, userId, currentStory) => {
   }
   if (
     file.fileId !== input.imageFileId || file.fileType !== "image" ||
-    !/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name ?? "") ||
+    !/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name) ||
     !Number.isFinite(file.size) || file.size <= 0 || file.size > MAX_IMAGE_SIZE ||
     file.isPrivateFile || file.isPublished === false ||
     !Number.isFinite(file.width) || file.width <= 0 ||

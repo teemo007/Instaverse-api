@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import jwt from "jsonwebtoken";
 import { afterEach, beforeEach, test } from "node:test";
+import type { NextFunction, Request, Response } from "express";
 
-import { createUploadAuthorization, resolveStoryImage } from "../services/imagekit.js";
+import { createUploadAuthorization, ImageKitError, resolveStoryImage } from "../services/imagekit.js";
 import { getUploadAuthorization } from "../controllers/images.js";
 
 const userId = "507f1f77bcf86cd799439011";
@@ -38,13 +39,15 @@ test("issues unique five-minute upload signatures without disclosing the private
   const auth = createUploadAuthorization(userId, uploadInput);
   assert.ok(auth.expire >= before + 300 && auth.expire <= before + 301);
   const verified = jwt.verify(auth.token, "private_test", { algorithms: ["HS256"], complete: true });
+  if (typeof verified.payload === "string") assert.fail("Expected an object JWT payload");
+  const payload = verified.payload;
   assert.equal(verified.header.kid, "public_test");
-  assert.equal(verified.payload.exp, auth.expire);
-  assert.equal(verified.payload.folder, `/instaverse/stories/${userId}`);
-  assert.equal(verified.payload.overwriteFile, "false");
-  assert.equal(verified.payload.isPrivateFile, "false");
-  assert.ok(verified.payload.checks.includes('"file.size" <= 5242880'));
-  for (const [key, value] of Object.entries(auth.fields)) assert.equal(verified.payload[key], value);
+  assert.equal(payload.exp, auth.expire);
+  assert.equal(payload.folder, `/instaverse/stories/${userId}`);
+  assert.equal(payload.overwriteFile, "false");
+  assert.equal(payload.isPrivateFile, "false");
+  assert.ok(String(payload.checks).includes('"file.size" <= 5242880'));
+  for (const [key, value] of Object.entries(auth.fields)) assert.equal(payload[key], value);
   assert.notEqual(auth.token, createUploadAuthorization(userId, uploadInput).token);
   assert.ok(!JSON.stringify(auth).includes("private_test"));
 });
@@ -61,20 +64,21 @@ test("upload signing rejects missing, unsupported and oversized file description
 });
 
 test("upload authorization rejects anonymous users", () => {
-  const res = {
-    status(code) { this.statusCode = code; return this; },
-    json(body) { this.body = body; return this; },
+  const result = {
+    statusCode: 200, body: undefined as unknown,
+    status(code: number) { result.statusCode = code; return result; },
+    json(body: unknown) { result.body = body; return result; },
     set() {},
   };
-  getUploadAuthorization({}, res);
-  assert.equal(res.statusCode, 401);
-  assert.ok(!res.body.signature);
+  getUploadAuthorization({} as Request, result as unknown as Response, (() => {}) as NextFunction);
+  assert.equal(result.statusCode, 401);
+  assert.ok(!(result.body as Record<string, unknown>).signature);
 });
 
 test("verified ImageKit metadata replaces client supplied URLs and dimensions", async () => {
   globalThis.fetch = async (url, options) => {
     assert.equal(url, `https://api.imagekit.io/v1/files/${fileId}/details`);
-    assert.equal(options.headers.Authorization, `Basic ${Buffer.from("private_test:").toString("base64")}`);
+    assert.equal(new Headers(options?.headers).get("Authorization"), `Basic ${Buffer.from("private_test:").toString("base64")}`);
     return Response.json(file);
   };
   assert.deepEqual(await resolveStoryImage({ image: "https://attacker.example/photo.jpg", imageFileId: fileId, imageWidth: 999 }, userId), {
@@ -110,9 +114,23 @@ test("oversized, non-image and private files cannot be published", async () => {
 
 test("provider failures do not expose credentials or provider response bodies", async () => {
   globalThis.fetch = async () => new Response("private_test", { status: 500 });
-  await assert.rejects(resolveStoryImage({ image, imageFileId: fileId }, userId), (error) => {
+  await assert.rejects(resolveStoryImage({ image, imageFileId: fileId }, userId), (error: unknown) => {
+    assert.ok(error instanceof ImageKitError);
     assert.equal(error.status, 502);
     assert.ok(!error.message.includes("private_test"));
     return true;
   });
+});
+
+test("provider JSON with the wrong shape is rejected with a sanitized error", async () => {
+  for (const body of [null, [], {}, { filePath: file.filePath }]) {
+    globalThis.fetch = async () => Response.json(body);
+    await assert.rejects(resolveStoryImage({ image, imageFileId: fileId }, userId), (error: unknown) => {
+      assert.ok(error instanceof ImageKitError);
+      assert.equal(error.status, 502);
+      assert.ok(!error.message.includes("private_test"));
+      assert.ok(!error.message.includes(JSON.stringify(body)));
+      return true;
+    });
+  }
 });

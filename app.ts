@@ -15,10 +15,10 @@ const app = express();
 dotenv.config();
 const PORT = process.env.PORT || 5001;
 
-app.use(bodyParser.json({ limit: "32mb", extended: true }));
+app.use(bodyParser.json({ limit: "32mb" }));
 app.use(bodyParser.urlencoded({ limit: "32mb", extended: true }));
 
-app.use(cors('*'));
+app.use(cors({ origin: "*" }));
 
 app.use("/stories", storyRoutes);
 app.use("/user", userRoutes);

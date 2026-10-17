@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "app.ts",
+    "config/**/*.ts",
+    "controllers/**/*.ts",
+    "middlewares/**/*.ts",
+    "models/**/*.ts",
+    "routes/**/*.ts",
+    "services/**/*.ts",
+    "tests/**/*.ts",
+    "types/**/*.d.ts"
+  ],
+  "exclude": ["dist", ".image-migrations", "node_modules"]
+}

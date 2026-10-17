@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": ".",
+    "outDir": "dist",
+    "sourceMap": true
+  },
+  "exclude": [
+    "tests",
+    "scripts",
+    "types/migrate-images.d.ts",
+    "dist",
+    ".image-migrations",
+    "node_modules"
+  ]
+}
