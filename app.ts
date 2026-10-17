@@ -9,6 +9,7 @@ import imageRoutes from "./routes/images.js";
 import dotenv from "dotenv";
 //import corsOptions from "./config/corsOptions.js";
 import connectDB from "./config/dbConnection.js";
+import { errorHandler, notFound } from "./middlewares/errorHandler.js";
 
 const app = express();
 
@@ -24,6 +25,9 @@ app.use("/stories", storyRoutes);
 app.use("/user", userRoutes);
 app.use("/comments", commentRoutes);
 app.use("/images", imageRoutes);
+
+app.use(notFound);
+app.use(errorHandler);
 
 connectDB();
 

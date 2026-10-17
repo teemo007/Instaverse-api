@@ -2,19 +2,19 @@ import mongoose from "mongoose";
 import Story from "../models/storyContent.js";
 import Comment from "../models/comment.js";
 import { ImageKitError, resolveStoryImage } from "../services/imagekit.js";
-import type { RequestHandler, Response } from "express";
+import type { NextFunction, RequestHandler, Response } from "express";
 
-const storyWriteError = (res: Response, error: unknown) => {
+const storyWriteError = (res: Response, next: NextFunction, error: unknown) => {
   if (error instanceof ImageKitError) {
     return res.status(error.status).json({ message: error.message });
   }
   if (error instanceof mongoose.Error.ValidationError) {
     return res.status(400).json({ message: "Provide a caption, username and valid image for the story." });
   }
-  return res.status(500).json({ message: "Unable to save the story. Please try again." });
+  return next(error);
 };
 
-const getStories: RequestHandler = async (_req, res) => {
+const getStories: RequestHandler = async (_req, res, next) => {
   try {
     const story = await Story.find({}).populate({
       path: "comments",
@@ -26,11 +26,11 @@ const getStories: RequestHandler = async (_req, res) => {
 
     res.status(200).json(story);
   } catch (error: unknown) {
-    res.status(404).json({ message: error instanceof Error ? error.message : "Unknown error" });
+    next(error);
   }
 };
 
-const createStory: RequestHandler = async (req, res) => {
+const createStory: RequestHandler = async (req, res, next) => {
   if (!req.userId) return res.status(401).json({ message: "Sign in before sharing a story." });
   try {
     const { caption, username, tags } = req.body;
@@ -43,11 +43,11 @@ const createStory: RequestHandler = async (req, res) => {
     await newStory.save();
     res.status(201).json(newStory);
   } catch (error) {
-    return storyWriteError(res, error);
+    return storyWriteError(res, next, error);
   }
 };
 
-const updateStory: RequestHandler = async (req, res) => {
+const updateStory: RequestHandler = async (req, res, next) => {
   if (!req.userId) return res.status(401).json({ message: "Sign in before editing a story." });
   const { id: _id } = req.params;
 
@@ -70,10 +70,10 @@ const updateStory: RequestHandler = async (req, res) => {
     await story.save();
     res.json(story);
   } catch (error) {
-    return storyWriteError(res, error);
+    return storyWriteError(res, next, error);
   }
 };
-const deleteStory: RequestHandler = async (req, res) => {
+const deleteStory: RequestHandler = async (req, res, next) => {
   if (!req.userId) return res.status(401).json({ message: "Sign in before deleting a story." });
   const { id } = req.params;
 
@@ -89,12 +89,12 @@ const deleteStory: RequestHandler = async (req, res) => {
     }
     await Story.findByIdAndDelete(id);
     res.json({ message: "Story deleted successfully" });
-  } catch {
-    res.status(500).json({ message: "Unable to delete the story. Please try again." });
+  } catch (error) {
+    next(error);
   }
 };
 
-const likeStory: RequestHandler = async (req, res) => {
+const likeStory: RequestHandler = async (req, res, next) => {
   const { id } = req.params;
 
   if (!req.userId) return res.json({ message: "Unauthenticated User" });
@@ -103,17 +103,21 @@ const likeStory: RequestHandler = async (req, res) => {
     return res.status(404).send("This id doesn't belong to any story");
   }
 
-  const story = await Story.findById(id);
-  if (!story) return res.status(404).json({ message: "Story not found." });
-  const index = story.likes.findIndex((id) => id === String(req.userId));
-  if (index === -1) {
-    story.likes.push(req.userId);
-  } else {
-    story.likes = story.likes.filter((id) => id !== String(req.userId));
-  }
+  try {
+    const story = await Story.findById(id);
+    if (!story) return res.status(404).json({ message: "Story not found." });
+    const index = story.likes.findIndex((id) => id === String(req.userId));
+    if (index === -1) {
+      story.likes.push(req.userId);
+    } else {
+      story.likes = story.likes.filter((id) => id !== String(req.userId));
+    }
 
-  const updateStory = await Story.findByIdAndUpdate(id, story, { new: true });
-  res.json(updateStory);
+    const updateStory = await Story.findByIdAndUpdate(id, story, { new: true });
+    res.json(updateStory);
+  } catch (error) {
+    next(error);
+  }
 };
 
 const createComment: RequestHandler = async (req, res) => {
