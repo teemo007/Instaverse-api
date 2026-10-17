@@ -2,16 +2,16 @@
   "name": "server",
   "version": "1.0.0",
   "description": "",
-  "main": "app.js",
+  "main": "dist/app.js",
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "start": "node app.js",
-    "dev": "nodemon app.js",
-    "test": "node --test",
+    "start": "node dist/app.js",
+    "dev": "tsx watch app.ts",
+    "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "verify:imagekit": "node scripts/verify-imagekit.js",
-    "migrate:images": "node scripts/migrate-images.js"
+    "verify:imagekit": "tsx scripts/verify-imagekit.js",
+    "migrate:images": "tsx scripts/migrate-images.js"
   },
   "engines": {
     "node": ">=20.9.0"

@@ -50,8 +50,18 @@ From this directory:
 
 ```bash
 npm run dev
+npm run typecheck
 npm run test
+npm run build
 npm run verify:imagekit
+```
+
+Production compiles TypeScript to `dist/` and runs the emitted JavaScript.
+For the Render web service, use:
+
+```text
+Build Command: npm ci && npm run build
+Start Command: npm start
 ```
 
 `verify:imagekit` uses local credentials to upload the frontend's logo into

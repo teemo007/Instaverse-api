@@ -1,15 +1,19 @@
 import mongoose from "mongoose";
 import Comment from "../models/comment.js";
 import Story from "../models/storyContent.js";
+import type { RequestHandler } from "express";
 
-const CommentController = {
+const CommentController: Record<
+  "addComment" | "addReplyToCommenet" | "getCommentsForStory" | "getRepliesForComment",
+  RequestHandler
+> = {
   addComment: async (req, res) => {
     const { story_id } = req.params;
     const content = req.body;
 
     if (!req.userId) return res.json({ message: "Unauthenticated User" });
 
-    if (!mongoose.Types.ObjectId.isValid(story_id)) {
+    if (!story_id || !mongoose.Types.ObjectId.isValid(story_id)) {
       return res.status(404).send("This id doesn't belong to any story");
     }
 
@@ -31,10 +35,10 @@ const CommentController = {
       );
 
       res.status(201).json(populatedComment);
-    } catch (error) {
+    } catch (error: unknown) {
       res
         .status(500)
-        .json({ message: `Error adding comment: ${error.message}` });
+        .json({ message: `Error adding comment: ${error instanceof Error ? error.message : "Unknown error"}` });
     }
   },
   // Add a reply to an existing comment
@@ -46,11 +50,11 @@ const CommentController = {
     if (!req.userId) return res.json({ message: "Unauthenticated User" });
 
     // Validate the story_id and parentCommentId
-    if (!mongoose.Types.ObjectId.isValid(story_id)) {
+    if (!story_id || !mongoose.Types.ObjectId.isValid(story_id)) {
       return res.status(400).json({ message: "Invalid story ID" });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(parentCommentId)) {
+    if (!parentCommentId || !mongoose.Types.ObjectId.isValid(parentCommentId)) {
       return res.status(404).json({ message: "Parent comment not found" });
     }
 
@@ -76,8 +80,12 @@ const CommentController = {
           },
         });
 
-      const plainReply = populatedReply.toObject(); 
-      plainReply.parentId = plainReply.parentId.user_id.username;
+      if (!populatedReply) return res.status(500).json({ message: "Error adding reply: Unknown error" });
+      const rawReply = populatedReply.toObject() as unknown as Record<string, unknown> & { parentId: { user_id: { username: string } } };
+      const plainReply: Record<string, unknown> = {
+        ...rawReply,
+        parentId: rawReply.parentId.user_id.username,
+      };
 
       await Comment.findByIdAndUpdate(
         parentCommentId,
@@ -86,8 +94,8 @@ const CommentController = {
       );
 
       res.status(201).json(plainReply);
-    } catch (error) {
-      res.status(500).json({ message: `Error adding reply: ${error.message}` });
+    } catch (error: unknown) {
+      res.status(500).json({ message: `Error adding reply: ${error instanceof Error ? error.message : "Unknown error"}` });
     }
   },
   getCommentsForStory: async (req, res) => {
@@ -95,7 +103,7 @@ const CommentController = {
 
     if (!req.userId) return res.json({ message: "Unauthenticated User" });
 
-    if (!mongoose.Types.ObjectId.isValid(story_id)) {
+    if (!story_id || !mongoose.Types.ObjectId.isValid(story_id)) {
       return res.status(404).send("This id doesn't belong to any story");
     }
 
@@ -106,10 +114,10 @@ const CommentController = {
       );
 
       res.status(200).json(comments);
-    } catch (error) {
+    } catch (error: unknown) {
       res
         .status(500)
-        .json({ message: `Error retrieving comments: ${error.message}` });
+        .json({ message: `Error retrieving comments: ${error instanceof Error ? error.message : "Unknown error"}` });
     }
   },
   getRepliesForComment: async (req, res) => {
@@ -117,7 +125,7 @@ const CommentController = {
 
     if (!req.userId) return res.json({ message: "Unauthenticated User" });
 
-    if (!mongoose.Types.ObjectId.isValid(comment_id)) {
+    if (!comment_id || !mongoose.Types.ObjectId.isValid(comment_id)) {
       return res.status(404).send("This id doesn't belong to any comment");
     }
 
@@ -135,18 +143,19 @@ const CommentController = {
           select: "-_id username",
         });
 
-      const plainReplies = comment.replies.map((reply) => reply.toObject());
+      if (!comment) return res.status(404).send("This id doesn't belong to any comment");
+      const plainReplies = comment.replies.map((reply) => (reply as unknown as { toObject(): Record<string, unknown> }).toObject());
 
       const enrichedReplies = plainReplies.map((reply) => ({
         ...reply,
-        parentId: comment.user_id ? comment.user_id.username : "Unknown",
+        parentId: comment.user_id ? (comment.user_id as unknown as { username: string }).username : "Unknown",
       }));
 
       res.status(200).json(enrichedReplies);
-    } catch (error) {
+    } catch (error: unknown) {
       res
         .status(500)
-        .json({ message: `Error retrieving replies: ${error.message}` });
+        .json({ message: `Error retrieving replies: ${error instanceof Error ? error.message : "Unknown error"}` });
     }
   },
 };

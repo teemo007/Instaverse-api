@@ -4,6 +4,7 @@ import { test } from "node:test";
 import sharp from "sharp";
 
 import { prepareLegacyImage, migrateLegacyStory, buildRestoreUpdate } from "../services/image-migration.js";
+import type { MigrationReceipt } from "../services/image-migration.js";
 import { verifyImage } from "../scripts/migrate-images.js";
 
 const png = await sharp({ create: { width: 16, height: 12, channels: 4, background: "#cc8844" } }).png().toBuffer();
@@ -35,7 +36,7 @@ test("oversized static images are resized and compressed below the upload limit"
 });
 
 test("backup and durable upload receipt precede verification and database replacement", async () => {
-  const order = [];
+  const order: string[] = [];
   const result = await migrateLegacyStory(story, {
     backup: async () => order.push("backup"),
     upload: async () => { order.push("upload"); return { url: verified.image, fileId: verified.imageFileId }; },
@@ -86,10 +87,10 @@ test("already migrated images are skipped without calling external dependencies"
 });
 
 test("resume reuses the persisted file instead of uploading it twice", async () => {
-  let receipt;
+  let receipt: MigrationReceipt | undefined;
   const dependencies = {
     backup: async () => {}, upload: async () => ({ url: verified.image, fileId: verified.imageFileId }),
-    recordUpload: async (value) => { receipt = value; },
+    recordUpload: async (value: MigrationReceipt) => { receipt = value; },
     verify: async () => { throw new Error("temporary outage"); },
   };
   await assert.rejects(migrateLegacyStory(story, dependencies));
@@ -113,7 +114,7 @@ test("the actual CLI verification function decodes CDN image bytes before accept
   process.env.IMAGEKIT_PRIVATE_KEY = "private_test";
   process.env.IMAGEKIT_URL_ENDPOINT = "https://ik.imagekit.io/test";
   let cdnBytes = png;
-  context.mock.method(globalThis, "fetch", async (url) => {
+  context.mock.method(globalThis, "fetch", async (url: string | URL | Request) => {
     if (String(url).startsWith("https://api.imagekit.io/")) return Response.json({
       fileId: verified.imageFileId, fileType: "image", name: "photo.png",
       filePath: `/instaverse/stories/${story.userId}/photo.png`, size: png.length, width: 16, height: 12,

@@ -2,8 +2,9 @@ import mongoose from "mongoose";
 import Story from "../models/storyContent.js";
 import Comment from "../models/comment.js";
 import { ImageKitError, resolveStoryImage } from "../services/imagekit.js";
+import type { RequestHandler, Response } from "express";
 
-const storyWriteError = (res, error) => {
+const storyWriteError = (res: Response, error: unknown) => {
   if (error instanceof ImageKitError) {
     return res.status(error.status).json({ message: error.message });
   }
@@ -13,7 +14,7 @@ const storyWriteError = (res, error) => {
   return res.status(500).json({ message: "Unable to save the story. Please try again." });
 };
 
-const getStories = async (req, res) => {
+const getStories: RequestHandler = async (_req, res) => {
   try {
     const story = await Story.find({}).populate({
       path: "comments",
@@ -24,12 +25,12 @@ const getStories = async (req, res) => {
     });
 
     res.status(200).json(story);
-  } catch (error) {
-    res.status(404).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(404).json({ message: error instanceof Error ? error.message : "Unknown error" });
   }
 };
 
-const createStory = async (req, res) => {
+const createStory: RequestHandler = async (req, res) => {
   if (!req.userId) return res.status(401).json({ message: "Sign in before sharing a story." });
   try {
     const { caption, username, tags } = req.body;
@@ -46,11 +47,11 @@ const createStory = async (req, res) => {
   }
 };
 
-const updateStory = async (req, res) => {
+const updateStory: RequestHandler = async (req, res) => {
   if (!req.userId) return res.status(401).json({ message: "Sign in before editing a story." });
   const { id: _id } = req.params;
 
-  if (!mongoose.Types.ObjectId.isValid(_id)) {
+  if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
     return res.status(404).send("This id doesn't belong to any story");
   }
 
@@ -61,7 +62,7 @@ const updateStory = async (req, res) => {
       return res.status(403).json({ message: "You can only edit your own stories." });
     }
     const image = await resolveStoryImage(req.body, req.userId, story);
-    const changes = { ...image };
+    const changes: Record<string, unknown> = { ...image };
     for (const field of ["caption", "tags"]) {
       if (Object.hasOwn(req.body, field)) changes[field] = req.body[field];
     }
@@ -72,11 +73,11 @@ const updateStory = async (req, res) => {
     return storyWriteError(res, error);
   }
 };
-const deleteStory = async (req, res) => {
+const deleteStory: RequestHandler = async (req, res) => {
   if (!req.userId) return res.status(401).json({ message: "Sign in before deleting a story." });
   const { id } = req.params;
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
     return res.status(404).send("This id doesnt belong to any story");
   }
 
@@ -93,16 +94,17 @@ const deleteStory = async (req, res) => {
   }
 };
 
-const likeStory = async (req, res) => {
+const likeStory: RequestHandler = async (req, res) => {
   const { id } = req.params;
 
   if (!req.userId) return res.json({ message: "Unauthenticated User" });
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
     return res.status(404).send("This id doesn't belong to any story");
   }
 
   const story = await Story.findById(id);
+  if (!story) return res.status(404).json({ message: "Story not found." });
   const index = story.likes.findIndex((id) => id === String(req.userId));
   if (index === -1) {
     story.likes.push(req.userId);
@@ -114,14 +116,14 @@ const likeStory = async (req, res) => {
   res.json(updateStory);
 };
 
-const createComment = async (req, res) => {
+const createComment: RequestHandler = async (req, res) => {
   const { id } = req.params;
 
   const content = req.body;
 
   if (!req.userId) return res.json({ message: "Unauthenticated User" });
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
     return res.status(404).send("This id doesn't belong to any story");
   }
   const newComment = await Comment.create({
@@ -130,13 +132,15 @@ const createComment = async (req, res) => {
     user_id: req.userId,
     createdAt: new Date().toISOString(),
   });
+  let updateStory: unknown;
   try {
     await newComment.save();
     const story = await Story.findById(id);
+    if (!story) return res.status(404).json({ message: "Story not found." });
 
-    story.comments.push(newComment);
+    story.comments.push(newComment._id);
 
-    const updateStory = await Story.findByIdAndUpdate(id, story, {
+    updateStory = await Story.findByIdAndUpdate(id, story, {
       new: true,
     }).populate({
       path: "comments",
@@ -148,8 +152,8 @@ const createComment = async (req, res) => {
     console.log(updateStory);
 
     res.status(201).json(updateStory);
-  } catch (error) {
-    res.status(409).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(409).json({ message: error instanceof Error ? error.message : "Unknown error" });
   }
 
   res.json(updateStory);

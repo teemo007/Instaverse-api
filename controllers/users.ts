@@ -1,9 +1,10 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import type { RequestHandler } from "express";
 
 import User from "../models/user.js";
 
-const signin = async (req, res) => {
+const signin: RequestHandler = async (req, res) => {
   const { email, password } = req.body;
   try {
     const oldUser = await User.findOne({ email: email });
@@ -19,7 +20,7 @@ const signin = async (req, res) => {
 
     const token = jwt.sign(
       { email: oldUser.email, uid: oldUser._id },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET ?? "",
       {
         expiresIn: "1h",
       }
@@ -31,7 +32,7 @@ const signin = async (req, res) => {
   }
 };
 
-const signup = async (req, res) => {
+const signup: RequestHandler = async (req, res) => {
   const { username, email, password, confirmPassword } = req.body;
   try {
     const oldUser = await User.findOne({ email: email });
@@ -54,7 +55,7 @@ const signup = async (req, res) => {
 
     const token = jwt.sign(
       { email: result.email, uid: result._id },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET ?? "",
       {
         expiresIn: "1h",
       }
