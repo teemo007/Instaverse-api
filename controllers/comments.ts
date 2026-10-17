@@ -7,7 +7,7 @@ const CommentController: Record<
   "addComment" | "addReplyToCommenet" | "getCommentsForStory" | "getRepliesForComment",
   RequestHandler
 > = {
-  addComment: async (req, res) => {
+  addComment: async (req, res, next) => {
     const { story_id } = req.params;
     const content = req.body;
 
@@ -36,15 +36,12 @@ const CommentController: Record<
 
       res.status(201).json(populatedComment);
     } catch (error: unknown) {
-      res
-        .status(500)
-        .json({ message: `Error adding comment: ${error instanceof Error ? error.message : "Unknown error"}` });
+      next(error);
     }
   },
   // Add a reply to an existing comment
-  addReplyToCommenet: async (req, res) => {
+  addReplyToCommenet: async (req, res, next) => {
     const { story_id, parentCommentId } = req.params;
-    const { content } = req.body;
     const userId = req.userId; // user_id
     //console.log("parentCommentId",parentCommentId)
     if (!req.userId) return res.json({ message: "Unauthenticated User" });
@@ -59,6 +56,7 @@ const CommentController: Record<
     }
 
     try {
+      const { content } = req.body;
       const reply = new Comment({
         story_id,
         user_id: userId,
@@ -95,10 +93,10 @@ const CommentController: Record<
 
       res.status(201).json(plainReply);
     } catch (error: unknown) {
-      res.status(500).json({ message: `Error adding reply: ${error instanceof Error ? error.message : "Unknown error"}` });
+      next(error);
     }
   },
-  getCommentsForStory: async (req, res) => {
+  getCommentsForStory: async (req, res, next) => {
     const { story_id } = req.params; 
 
     if (!req.userId) return res.json({ message: "Unauthenticated User" });
@@ -115,12 +113,10 @@ const CommentController: Record<
 
       res.status(200).json(comments);
     } catch (error: unknown) {
-      res
-        .status(500)
-        .json({ message: `Error retrieving comments: ${error instanceof Error ? error.message : "Unknown error"}` });
+      next(error);
     }
   },
-  getRepliesForComment: async (req, res) => {
+  getRepliesForComment: async (req, res, next) => {
     const { comment_id } = req.params;
 
     if (!req.userId) return res.json({ message: "Unauthenticated User" });
@@ -153,9 +149,7 @@ const CommentController: Record<
 
       res.status(200).json(enrichedReplies);
     } catch (error: unknown) {
-      res
-        .status(500)
-        .json({ message: `Error retrieving replies: ${error instanceof Error ? error.message : "Unknown error"}` });
+      next(error);
     }
   },
 };

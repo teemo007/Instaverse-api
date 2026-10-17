@@ -1,7 +1,7 @@
 import { createUploadAuthorization, ImageKitError } from "../services/imagekit.js";
 import type { RequestHandler } from "express";
 
-export const getUploadAuthorization: RequestHandler = (req, res) => {
+export const getUploadAuthorization: RequestHandler = (req, res, next) => {
   if (!req.userId) {
     return res.status(401).json({ message: "Sign in before uploading an image." });
   }
@@ -9,8 +9,9 @@ export const getUploadAuthorization: RequestHandler = (req, res) => {
   try {
     return res.json(createUploadAuthorization(req.userId, req.body));
   } catch (error) {
-    return res.status(error instanceof ImageKitError ? error.status : 500).json({
-      message: error instanceof ImageKitError ? error.message : "Unable to authorize the image upload.",
-    });
+    if (error instanceof ImageKitError) {
+      return res.status(error.status).json({ message: error.message });
+    }
+    return next(error);
   }
 };

@@ -1,5 +1,7 @@
 # Instaverse API — ImageKit integration
 
+Frontend repository: [Instaverse](https://github.com/teemo007/Instaverse)
+
 Use Node.js 20.9 or later. Configure the API's `.env` with `MONGO_URI`,
 `JWT_SECRET`, `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, and
 `IMAGEKIT_URL_ENDPOINT` (see `.env.example`). No ImageKit key belongs in the
