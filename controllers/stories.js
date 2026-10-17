@@ -1,6 +1,17 @@
 import mongoose from "mongoose";
 import Story from "../models/storyContent.js";
 import Comment from "../models/comment.js";
+import { ImageKitError, resolveStoryImage } from "../services/imagekit.js";
+
+const storyWriteError = (res, error) => {
+  if (error instanceof ImageKitError) {
+    return res.status(error.status).json({ message: error.message });
+  }
+  if (error instanceof mongoose.Error.ValidationError) {
+    return res.status(400).json({ message: "Provide a caption, username and valid image for the story." });
+  }
+  return res.status(500).json({ message: "Unable to save the story. Please try again." });
+};
 
 const getStories = async (req, res) => {
   try {
@@ -19,43 +30,67 @@ const getStories = async (req, res) => {
 };
 
 const createStory = async (req, res) => {
-  const body = req.body;
-  const newStory = new Story({
-    ...body,
-    userId: req.userId,
-    postDate: new Date().toISOString(),
-  });
+  if (!req.userId) return res.status(401).json({ message: "Sign in before sharing a story." });
   try {
+    const { caption, username, tags } = req.body;
+    const image = await resolveStoryImage(req.body, req.userId);
+    const newStory = new Story({
+      caption, username, tags, ...image,
+      userId: req.userId,
+      postDate: new Date().toISOString(),
+    });
     await newStory.save();
     res.status(201).json(newStory);
   } catch (error) {
-    res.status(409).json({ message: error.message });
+    return storyWriteError(res, error);
   }
 };
 
 const updateStory = async (req, res) => {
+  if (!req.userId) return res.status(401).json({ message: "Sign in before editing a story." });
   const { id: _id } = req.params;
-
-  const story = req.body;
 
   if (!mongoose.Types.ObjectId.isValid(_id)) {
     return res.status(404).send("This id doesn't belong to any story");
   }
 
-  const updatedStory = await Story.findByIdAndUpdate(_id, story, { new: true });
-
-  res.json(updatedStory);
+  try {
+    const story = await Story.findById(_id);
+    if (!story) return res.status(404).json({ message: "Story not found." });
+    if (String(story.userId) !== req.userId) {
+      return res.status(403).json({ message: "You can only edit your own stories." });
+    }
+    const image = await resolveStoryImage(req.body, req.userId, story);
+    const changes = { ...image };
+    for (const field of ["caption", "tags"]) {
+      if (Object.hasOwn(req.body, field)) changes[field] = req.body[field];
+    }
+    story.set(changes);
+    await story.save();
+    res.json(story);
+  } catch (error) {
+    return storyWriteError(res, error);
+  }
 };
 const deleteStory = async (req, res) => {
+  if (!req.userId) return res.status(401).json({ message: "Sign in before deleting a story." });
   const { id } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(404).send("This id doesnt belong to any story");
   }
 
-  await Story.findByIdAndDelete(id);
-
-  res.json({ message: "Story deleted successfully" });
+  try {
+    const story = await Story.findById(id);
+    if (!story) return res.status(404).json({ message: "Story not found." });
+    if (String(story.userId) !== req.userId) {
+      return res.status(403).json({ message: "You can only delete your own stories." });
+    }
+    await Story.findByIdAndDelete(id);
+    res.json({ message: "Story deleted successfully" });
+  } catch {
+    res.status(500).json({ message: "Unable to delete the story. Please try again." });
+  }
 };
 
 const likeStory = async (req, res) => {
