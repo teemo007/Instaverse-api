@@ -5,6 +5,7 @@ import cors from "cors";
 import storyRoutes from "./routes/stories.js";
 import userRoutes from "./routes/user.js";
 import commentRoutes from "./routes/comments.js"
+import imageRoutes from "./routes/images.js";
 import dotenv from "dotenv";
 //import corsOptions from "./config/corsOptions.js";
 import connectDB from "./config/dbConnection.js";
@@ -22,6 +23,7 @@ app.use(cors('*'));
 app.use("/stories", storyRoutes);
 app.use("/user", userRoutes);
 app.use("/comments", commentRoutes);
+app.use("/images", imageRoutes);
 
 connectDB();
 

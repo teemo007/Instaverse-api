@@ -139,3 +139,7 @@ dist
 # SvelteKit build / generate output
 .svelte-kit
 
+# Private original-image backups and migration checkpoints
+.image-migrations/
+.gitignore
+.env.example
