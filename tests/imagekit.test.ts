@@ -123,12 +123,14 @@ test("provider failures do not expose credentials or provider response bodies", 
 });
 
 test("provider JSON with the wrong shape is rejected with a sanitized error", async () => {
-  globalThis.fetch = async () => Response.json(null);
-  await assert.rejects(resolveStoryImage({ image, imageFileId: fileId }, userId), (error: unknown) => {
-    assert.ok(error instanceof ImageKitError);
-    assert.equal(error.status, 502);
-    assert.ok(!error.message.includes("private_test"));
-    assert.ok(!error.message.includes("null"));
-    return true;
-  });
+  for (const body of [null, [], {}, { filePath: file.filePath }]) {
+    globalThis.fetch = async () => Response.json(body);
+    await assert.rejects(resolveStoryImage({ image, imageFileId: fileId }, userId), (error: unknown) => {
+      assert.ok(error instanceof ImageKitError);
+      assert.equal(error.status, 502);
+      assert.ok(!error.message.includes("private_test"));
+      assert.ok(!error.message.includes(JSON.stringify(body)));
+      return true;
+    });
+  }
 });

@@ -50,7 +50,27 @@ const getConfig = () => {
 const imageFolder = (userId: string) => `/instaverse/stories/${userId}`;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+interface ProviderFile extends Record<string, unknown> {
+  fileId: string;
+  filePath: string;
+  fileType: string;
+  name: string;
+  size: number;
+  width: number;
+  height: number;
+}
+
+const isProviderFile = (value: unknown): value is ProviderFile =>
+  isRecord(value) &&
+  typeof value.fileId === "string" &&
+  typeof value.filePath === "string" &&
+  typeof value.fileType === "string" &&
+  typeof value.name === "string" &&
+  typeof value.size === "number" &&
+  typeof value.width === "number" &&
+  typeof value.height === "number";
 
 export const createUploadAuthorization = (userId: string, input: unknown): UploadAuthorization => {
   const { publicKey, privateKey } = getConfig();
@@ -115,19 +135,19 @@ export const resolveStoryImage = async (
   } catch {
     throw new ImageKitError("Invalid response from the image provider. Please try again.", 502);
   }
-  if (!isRecord(file)) {
+  if (!isProviderFile(file)) {
     throw new ImageKitError("Invalid response from the image provider. Please try again.", 502);
   }
   if (typeof file.filePath !== "string" || !file.filePath.startsWith(`${imageFolder(userId)}/`)) {
     throw new ImageKitError("This image does not belong to your upload folder.", 403);
   }
   if (
-    typeof file.fileId !== "string" || file.fileId !== input.imageFileId || file.fileType !== "image" ||
-    typeof file.name !== "string" || !/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name) ||
-    typeof file.size !== "number" || !Number.isFinite(file.size) || file.size <= 0 || file.size > MAX_IMAGE_SIZE ||
+    file.fileId !== input.imageFileId || file.fileType !== "image" ||
+    !/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name) ||
+    !Number.isFinite(file.size) || file.size <= 0 || file.size > MAX_IMAGE_SIZE ||
     file.isPrivateFile || file.isPublished === false ||
-    typeof file.width !== "number" || !Number.isFinite(file.width) || file.width <= 0 ||
-    typeof file.height !== "number" || !Number.isFinite(file.height) || file.height <= 0
+    !Number.isFinite(file.width) || file.width <= 0 ||
+    !Number.isFinite(file.height) || file.height <= 0
   ) {
     throw new ImageKitError("Use a public JPEG, PNG, WebP, GIF or AVIF image up to 5 MB.");
   }
