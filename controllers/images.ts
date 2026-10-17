@@ -1,6 +1,7 @@
 import { createUploadAuthorization, ImageKitError } from "../services/imagekit.js";
+import type { RequestHandler } from "express";
 
-export const getUploadAuthorization = (req, res) => {
+export const getUploadAuthorization: RequestHandler = (req, res) => {
   if (!req.userId) {
     return res.status(401).json({ message: "Sign in before uploading an image." });
   }

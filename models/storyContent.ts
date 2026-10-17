@@ -1,6 +1,20 @@
 import mongoose from "mongoose";
 
-const storySchema = mongoose.Schema({
+export interface IStory {
+  caption: string;
+  username: string;
+  userId: mongoose.Types.ObjectId;
+  image: string;
+  imageFileId?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  tags?: string;
+  likes: string[];
+  postDate: Date;
+  comments: mongoose.Types.ObjectId[];
+}
+
+const storySchema = new mongoose.Schema<IStory>({
   caption: {
     type: String,
     required: true,
@@ -28,4 +42,4 @@ const storySchema = mongoose.Schema({
   },
 });
 
-export default mongoose.model("Story", storySchema);
+export default mongoose.model<IStory>("Story", storySchema);
