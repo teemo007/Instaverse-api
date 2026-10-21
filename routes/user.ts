@@ -1,6 +1,8 @@
 import { Router } from "express";
 import {
   getSession,
+  googleLink,
+  googleSignin,
   signin,
   signout,
   signup,
@@ -10,6 +12,8 @@ const router = Router();
 
 router.post("/signin", signin);
 router.post("/signup", signup);
+router.post("/google", googleSignin);
+router.post("/google/link", googleLink);
 router.get("/session", getSession);
 router.post("/signout", signout);
 
