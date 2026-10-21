@@ -195,7 +195,7 @@ test("session restore returns the current public user and CSRF token", async () 
 
   await getSession({
     cookies: { [SESSION_COOKIE_NAME]: token },
-  } as Request, res, nextCapture().next);
+  } as unknown as Request, res, nextCapture().next);
 
   assert.deepEqual(res.body, {
     user: {
@@ -214,7 +214,7 @@ test("session restore returns the current public user and CSRF token", async () 
 test("missing session restoration returns 401 and clears the cookie", async () => {
   const res = response();
 
-  await getSession({ cookies: {} } as Request, res, nextCapture().next);
+  await getSession({ cookies: {} } as unknown as Request, res, nextCapture().next);
 
   assert.equal(res.statusCode, 401);
   assert.equal((res.body as { code: string }).code, "UNAUTHENTICATED");
@@ -232,7 +232,7 @@ test("sign-out deletes the hashed session and clears its cookie", async () => {
 
   await signout({
     cookies: { [SESSION_COOKIE_NAME]: token },
-  } as Request, res, nextCapture().next);
+  } as unknown as Request, res, nextCapture().next);
 
   assert.equal(res.statusCode, 204);
   assert.equal(res.sent, true);

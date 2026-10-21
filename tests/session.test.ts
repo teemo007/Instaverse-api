@@ -116,14 +116,16 @@ test("production session cookies are secure, host-only, and browser-session scop
 
 test("development cookie parsing and clearing use the same host-only scope", () => {
   const token = "ef".repeat(32);
-  const req = { cookies: { [SESSION_COOKIE_NAME]: token } } as Request;
+  const req = { cookies: { [SESSION_COOKIE_NAME]: token } } as unknown as Request;
   let received: unknown[] = [];
   const res = {
     clearCookie: (...args: unknown[]) => { received = args; },
   } as unknown as Response;
 
   assert.equal(readSessionCookie(req), token);
-  assert.equal(readSessionCookie({ cookies: { [SESSION_COOKIE_NAME]: "bad" } } as Request), undefined);
+  assert.equal(readSessionCookie({
+    cookies: { [SESSION_COOKIE_NAME]: "bad" },
+  } as unknown as Request), undefined);
   clearSessionCookie(res);
   assert.deepEqual(received, [SESSION_COOKIE_NAME, {
     httpOnly: true,
