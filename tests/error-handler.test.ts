@@ -61,6 +61,24 @@ test("errorHandler preserves explicit HTTP errors", async () => {
   assert.deepEqual(res.body, { message: "Service unavailable." });
 });
 
+test("errorHandler includes stable codes from explicit application errors", async () => {
+  const { HttpError, errorHandler } = await import("../middlewares/errorHandler.js");
+  const res = response();
+
+  errorHandler(
+    new HttpError(401, "Sign in required.", "UNAUTHENTICATED"),
+    request(),
+    res,
+    (() => {}) as NextFunction,
+  );
+
+  assert.equal(res.statusCode, 401);
+  assert.deepEqual(res.body, {
+    message: "Sign in required.",
+    code: "UNAUTHENTICATED",
+  });
+});
+
 test("errorHandler preserves exposable parser 4xx errors", async () => {
   const { errorHandler } = await import("../middlewares/errorHandler.js");
   const res = response();
