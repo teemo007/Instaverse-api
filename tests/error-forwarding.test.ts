@@ -30,7 +30,9 @@ afterEach(() => mock.restoreAll());
 
 test("signin forwards unexpected errors to the shared handler", async () => {
   const failure = new Error("database unavailable");
-  mock.method(User, "findOne", async () => { throw failure; });
+  mock.method(User, "findOne", () => ({
+    select: async () => { throw failure; },
+  }) as unknown as ReturnType<typeof User.findOne>);
   const req = { body: { email: "person@example.com", password: "secret" } } as Request;
   const res = response();
   const capture = nextCapture();

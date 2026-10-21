@@ -10,6 +10,8 @@
     "dev": "tsx watch app.ts",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
+    "check:duplicate-emails": "tsx scripts/check-duplicate-emails.ts",
+    "create:user-indexes": "tsx scripts/create-user-indexes.ts",
     "verify:imagekit": "tsx scripts/verify-imagekit.js",
     "migrate:images": "tsx scripts/migrate-images.js"
   },

@@ -3,16 +3,19 @@ import bcrypt from "bcryptjs";
 import type { RequestHandler } from "express";
 
 import User from "../models/user.js";
+import { findUserForPassword } from "../services/authValidation.js";
 
 const signin: RequestHandler = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const oldUser = await User.findOne({ email: email });
+    const oldUser = await findUserForPassword(email);
     if (!oldUser) {
       return res.status(400).json({ msg: "User does not exist" });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, oldUser.password);
+    const isPasswordValid = oldUser.password
+      ? await bcrypt.compare(password, oldUser.password)
+      : false;
 
     if (!isPasswordValid) {
       return res.status(400).json({ msg: "Invalid Password" });
