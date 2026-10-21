@@ -1,4 +1,3 @@
-import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
@@ -32,7 +31,7 @@ export const createApp = () => {
   app.use(helmet());
   app.use(cors(corsOptions));
   app.use(cookieParser());
-  app.use(bodyParser.json({ limit: "32mb" }));
+  app.use(express.json({ limit: "32mb" }));
 
   app.use("/stories", storyRoutes);
   app.use("/user", userRoutes);
