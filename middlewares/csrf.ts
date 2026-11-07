@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { RequestHandler } from "express";
 
-import { getAllowedOrigins } from "../config/allowedOrigins.js";
+import { isAllowedOrigin } from "../config/allowedOrigins.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -22,7 +22,7 @@ export const requireCsrf: RequestHandler = (req, res, next) => {
   const expectedToken = req.authSession?.csrfToken;
   if (
     !origin ||
-    !getAllowedOrigins().includes(origin) ||
+    !isAllowedOrigin(origin) ||
     !token ||
     !expectedToken ||
     !matches(token, expectedToken)

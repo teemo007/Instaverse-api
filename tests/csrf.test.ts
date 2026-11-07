@@ -121,6 +121,64 @@ test("production rejects unsafe requests with foreign or missing origins", () =>
   }
 });
 
+test("development accepts loopback origins on any Vite port", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "development";
+  try {
+    for (const origin of [
+      "http://localhost:5174",
+      "http://127.0.0.1:5175",
+      "http://[::1]:5173",
+    ]) {
+      const counter = nextCounter();
+      requireCsrf(
+        request("POST", { origin, "x-csrf-token": "csrf-token" }),
+        response(),
+        counter.next,
+      );
+      assert.equal(counter.calls(), 1, origin);
+    }
+
+    const res = response();
+    requireCsrf(
+      request("POST", {
+        origin: "http://localhost.evil.example:5174",
+        "x-csrf-token": "csrf-token",
+      }),
+      res,
+      nextCounter().next,
+    );
+    assert.equal(res.statusCode, 403);
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+  }
+});
+
+test("production does not accept loopback origins unless configured", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousOrigin = process.env.FRONTEND_ORIGIN;
+  process.env.NODE_ENV = "production";
+  process.env.FRONTEND_ORIGIN = "https://frontend.example";
+  try {
+    const res = response();
+    requireCsrf(
+      request("POST", {
+        origin: "http://localhost:5174",
+        "x-csrf-token": "csrf-token",
+      }),
+      res,
+      nextCounter().next,
+    );
+    assert.equal(res.statusCode, 403);
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+    if (previousOrigin === undefined) delete process.env.FRONTEND_ORIGIN;
+    else process.env.FRONTEND_ORIGIN = previousOrigin;
+  }
+});
+
 test("unsafe API requests require JSON content", () => {
   const rejected = response();
   requireJson(
