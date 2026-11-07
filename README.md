@@ -44,8 +44,8 @@ sequenceDiagram
     end
 
     API->>DB: Store SHA-256 session token hash + CSRF token + expiry
-    API-->>Static: user + CSRF token<br/>Set-Cookie: HttpOnly; Secure; SameSite=Lax
-    Static-->>Browser: Same-origin response; host-only session cookie
+    API-->>Static: user + CSRF token<br/>Set-Cookie: HttpOnly#59; Secure#59; SameSite=Lax
+    Static-->>Browser: Same-origin response#59; host-only session cookie
     Note over Browser: Cookie has no Domain, Expires, or Max-Age<br/>CSRF token stays only in Redux memory
 
     Browser->>Static: Unsafe /api request<br/>cookie + Origin + X-CSRF-Token
