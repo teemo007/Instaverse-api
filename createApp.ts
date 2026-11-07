@@ -12,6 +12,8 @@ import userRoutes from "./routes/user.js";
 
 type Environment = Record<string, string | undefined>;
 
+export const JSON_BODY_LIMIT = "100kb";
+
 export const validateProductionEnvironment = (environment: Environment): void => {
   if (environment.NODE_ENV !== "production") {
     return;
@@ -31,7 +33,9 @@ export const createApp = () => {
   app.use(helmet());
   app.use(cors(corsOptions));
   app.use(cookieParser());
-  app.use(express.json({ limit: "32mb" }));
+  // Images upload straight to ImageKit, so API bodies are small JSON documents.
+  // Compressed bodies are refused (GHSA-27r3-jxmh-p828 has no patched body-parser).
+  app.use(express.json({ limit: JSON_BODY_LIMIT, inflate: false }));
 
   app.use("/stories", storyRoutes);
   app.use("/user", userRoutes);

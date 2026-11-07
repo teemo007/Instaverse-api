@@ -1,7 +1,24 @@
 import mongoose from "mongoose";
 import Comment from "../models/comment.js";
 import Story from "../models/storyContent.js";
-import type { RequestHandler } from "express";
+import type { RequestHandler, Response } from "express";
+
+export const COMMENT_MAX_LENGTH = 100;
+
+// Only the comment text is client-controlled; ids, dates and threading are set here.
+const readCommentContent = (body: unknown): string | null => {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return null;
+  const content = (body as Record<string, unknown>).content;
+  if (typeof content !== "string") return null;
+  const trimmed = content.trim();
+  return trimmed.length >= 1 && trimmed.length <= COMMENT_MAX_LENGTH ? trimmed : null;
+};
+
+const rejectInvalidContent = (res: Response) =>
+  res.status(400).json({
+    message: `Write a comment of 1 to ${COMMENT_MAX_LENGTH} characters.`,
+    code: "VALIDATION_FAILED",
+  });
 
 const CommentController: Record<
   "addComment" | "addReplyToCommenet" | "getCommentsForStory" | "getRepliesForComment",
@@ -9,7 +26,6 @@ const CommentController: Record<
 > = {
   addComment: async (req, res, next) => {
     const { story_id } = req.params;
-    const content = req.body;
 
     if (!req.userId) return res.json({ message: "Unauthenticated User" });
 
@@ -17,9 +33,16 @@ const CommentController: Record<
       return res.status(404).send("This id doesn't belong to any story");
     }
 
+    const content = readCommentContent(req.body);
+    if (content === null) return rejectInvalidContent(res);
+
     try {
+      if (!(await Story.exists({ _id: story_id }))) {
+        return res.status(404).json({ message: "Story not found." });
+      }
+
       const newComment = new Comment({
-        ...content,
+        content,
         story_id: story_id,
         user_id: req.userId,
       });
@@ -55,8 +78,16 @@ const CommentController: Record<
       return res.status(404).json({ message: "Parent comment not found" });
     }
 
+    const content = readCommentContent(req.body);
+    if (content === null) return rejectInvalidContent(res);
+
     try {
-      const { content } = req.body;
+      // The parent must exist and belong to the same story the reply is posted under.
+      const parent = await Comment.exists({ _id: parentCommentId, story_id });
+      if (!parent) {
+        return res.status(404).json({ message: "Parent comment not found" });
+      }
+
       const reply = new Comment({
         story_id,
         user_id: userId,
@@ -79,10 +110,13 @@ const CommentController: Record<
         });
 
       if (!populatedReply) return res.status(500).json({ message: "Error adding reply: Unknown error" });
-      const rawReply = populatedReply.toObject() as unknown as Record<string, unknown> & { parentId: { user_id: { username: string } } };
+      const rawReply = populatedReply.toObject() as unknown as Record<string, unknown> & {
+        parentId?: { user_id?: { username?: string } | null } | null;
+      };
       const plainReply: Record<string, unknown> = {
         ...rawReply,
-        parentId: rawReply.parentId.user_id.username,
+        // The parent's author may have been deleted; mirror getRepliesForComment.
+        parentId: rawReply.parentId?.user_id?.username ?? "Unknown",
       };
 
       await Comment.findByIdAndUpdate(
