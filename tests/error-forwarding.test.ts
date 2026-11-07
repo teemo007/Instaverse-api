@@ -5,6 +5,7 @@ import type { NextFunction, Request, Response } from "express";
 import CommentController from "../controllers/comments.js";
 import { getStories } from "../controllers/stories.js";
 import { signin, signup } from "../controllers/users.js";
+import Comment from "../models/comment.js";
 import Story from "../models/storyContent.js";
 import User from "../models/user.js";
 
@@ -77,8 +78,10 @@ test("auth handlers reject malformed request bodies with stable errors", async (
   }
 });
 
-test("reply creation forwards malformed request bodies", async () => {
+test("reply creation rejects malformed request bodies without touching the database", async () => {
+  mock.method(Comment, "exists", () => assert.fail("No lookup expected"));
   const capture = nextCapture();
+  const res = response();
   const req = {
     body: undefined,
     params: {
@@ -88,7 +91,9 @@ test("reply creation forwards malformed request bodies", async () => {
     userId: "user-123",
   } as unknown as Request;
 
-  await CommentController.addReplyToCommenet(req, response(), capture.next);
+  await CommentController.addReplyToCommenet(req, res, capture.next);
 
-  assert.ok(capture.error() instanceof TypeError);
+  assert.equal(capture.error(), undefined);
+  assert.equal(res.statusCode, 400);
+  assert.equal((res.body as { code: string }).code, "VALIDATION_FAILED");
 });

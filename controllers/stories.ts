@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Story from "../models/storyContent.js";
 import Comment from "../models/comment.js";
+import User from "../models/user.js";
 import { ImageKitError, resolveStoryImage } from "../services/imagekit.js";
 import type { NextFunction, RequestHandler, Response } from "express";
 
@@ -33,10 +34,13 @@ const getStories: RequestHandler = async (_req, res, next) => {
 const createStory: RequestHandler = async (req, res, next) => {
   if (!req.userId) return res.status(401).json({ message: "Sign in before sharing a story." });
   try {
-    const { caption, username, tags } = req.body;
+    // The author name always comes from the signed-in account, never the request body.
+    const author = await User.findById(req.userId).select("username");
+    if (!author) return res.status(401).json({ message: "Sign in before sharing a story." });
+    const { caption, tags } = req.body;
     const image = await resolveStoryImage(req.body, req.userId);
     const newStory = new Story({
-      caption, username, tags, ...image,
+      caption, username: author.username, tags, ...image,
       userId: req.userId,
       postDate: new Date().toISOString(),
     });

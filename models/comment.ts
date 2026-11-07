@@ -15,8 +15,8 @@ const commentSchema = new mongoose.Schema<IComment>({
     ref: "Story",
     required: true,
   },
-  user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", require: true },
-  content: { type: String, require: true, maxLength: 100 },
+  user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  content: { type: String, required: true, trim: true, maxLength: 100 },
   createdAt: {
     type: Date,
     default: Date.now,
