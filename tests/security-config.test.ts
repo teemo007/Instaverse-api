@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { gzipSync } from "node:zlib";
 import request from "supertest";
 
 import { createApp, validateProductionEnvironment } from "../createApp.js";
@@ -39,6 +40,27 @@ test("the app rejects non-JSON authentication requests", async () => {
     message: "Content-Type must be application/json.",
     code: "CONTENT_TYPE_REQUIRED",
   });
+});
+
+test("oversized JSON bodies are rejected before reaching any route", async () => {
+  const app = createApp();
+  const response = await request(app)
+    .post("/stories")
+    .set("Content-Type", "application/json")
+    .send(JSON.stringify({ caption: "x".repeat(150 * 1024) }));
+
+  assert.equal(response.status, 413);
+});
+
+test("compressed JSON bodies are refused", async () => {
+  const app = createApp();
+  const response = await request(app)
+    .post("/stories")
+    .set("Content-Type", "application/json")
+    .set("Content-Encoding", "gzip")
+    .send(gzipSync(JSON.stringify({ caption: "hello" })));
+
+  assert.equal(response.status, 415);
 });
 
 test("password authentication attempts are rate limited by IP", async () => {

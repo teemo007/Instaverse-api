@@ -4,6 +4,7 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 import { createStory, updateStory, deleteStory } from "../controllers/stories.js";
 import Story from "../models/storyContent.js";
+import User from "../models/user.js";
 
 const owner = "507f1f77bcf86cd799439011";
 const storyId = "507f191e810c19729de860ea";
@@ -46,17 +47,28 @@ test("new stories persist verified CDN metadata and ignore injected likes", asyn
     fileId, name: "photo.jpg", filePath: `/instaverse/stories/${owner}/photo.jpg`,
     fileType: "image", size: 1200, width: 800, height: 600,
   });
+  mock.method(User, "findById", () => ({ select: async () => ({ username: "kyle" }) }) as unknown as ReturnType<typeof User.findById>);
   mock.method(Story.prototype, "save", async function (this: typeof Story.prototype) { return this; });
   const res = response();
   await invoke(createStory, { userId: owner, body: {
-    caption: "new", username: "kyle", image: "untrusted", imageFileId: fileId, likes: ["injected"],
+    caption: "new", username: "someone-else", image: "untrusted", imageFileId: fileId, likes: ["injected"],
   } }, res);
   assert.equal(res.statusCode, 201);
-  const body = res.body as { image: string; imageFileId: string; imageWidth: number; likes: string[] };
+  const body = res.body as { username: string; image: string; imageFileId: string; imageWidth: number; likes: string[] };
+  assert.equal(body.username, "kyle");
   assert.equal(body.image, image);
   assert.equal(body.imageFileId, fileId);
   assert.equal(body.imageWidth, 800);
   assert.deepEqual([...body.likes], []);
+});
+
+test("a signed-in account that no longer exists cannot create stories", async () => {
+  mock.method(User, "findById", () => ({ select: async () => null }) as unknown as ReturnType<typeof User.findById>);
+  mock.method(Story.prototype, "save", () => assert.fail("No database write expected"));
+  globalThis.fetch = () => assert.fail("No image verification expected");
+  const res = response();
+  await invoke(createStory, { userId: owner, body: { caption: "new", username: "kyle", imageFileId: fileId } }, res);
+  assert.equal(res.statusCode, 401);
 });
 
 test("another user cannot update or delete a story", async () => {
