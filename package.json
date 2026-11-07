@@ -10,31 +10,40 @@
     "dev": "tsx watch app.ts",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
+    "check:duplicate-emails": "tsx scripts/check-duplicate-emails.ts",
+    "create:user-indexes": "tsx scripts/create-user-indexes.ts",
     "verify:imagekit": "tsx scripts/verify-imagekit.js",
     "migrate:images": "tsx scripts/migrate-images.js"
   },
   "engines": {
-      "node": ">=20.9.0 <25.0.0"
+    "node": ">=20.9.0 <25.0.0"
   },
   "author": "zijie",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "body-parser": "^1.20.2",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.3.1",
-    "nodemon": "^3.1.0",
+    "express": "^4.22.3",
+    "express-rate-limit": "^8.7.1",
+    "google-auth-library": "^10.9.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.24.6",
+    "proxy-addr": "^2.0.8",
     "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.25",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.19.43",
+    "@types/supertest": "^7.2.1",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }

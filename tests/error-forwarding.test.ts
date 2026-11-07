@@ -30,7 +30,9 @@ afterEach(() => mock.restoreAll());
 
 test("signin forwards unexpected errors to the shared handler", async () => {
   const failure = new Error("database unavailable");
-  mock.method(User, "findOne", async () => { throw failure; });
+  mock.method(User, "findOne", () => ({
+    select: async () => { throw failure; },
+  }) as unknown as ReturnType<typeof User.findOne>);
   const req = { body: { email: "person@example.com", password: "secret" } } as Request;
   const res = response();
   const capture = nextCapture();
@@ -57,13 +59,21 @@ test("getStories forwards unexpected errors to the shared handler", async () => 
   assert.equal(res.body, undefined);
 });
 
-test("auth handlers forward malformed request bodies", async () => {
-  for (const handler of [signin, signup]) {
+test("auth handlers reject malformed request bodies with stable errors", async () => {
+  const cases = [
+    { handler: signin, status: 401, code: "INVALID_CREDENTIALS" },
+    { handler: signup, status: 400, code: "VALIDATION_FAILED" },
+  ];
+
+  for (const { handler, status, code } of cases) {
     const capture = nextCapture();
+    const res = response();
 
-    await handler({ body: undefined } as Request, response(), capture.next);
+    await handler({ body: undefined } as Request, res, capture.next);
 
-    assert.ok(capture.error() instanceof TypeError);
+    assert.equal(capture.error(), undefined);
+    assert.equal(res.statusCode, status);
+    assert.equal((res.body as { code: string }).code, code);
   }
 });
 

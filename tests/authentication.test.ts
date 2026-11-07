@@ -1,69 +1,132 @@
 import assert from "node:assert/strict";
 import { afterEach, mock, test } from "node:test";
 import type { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
 
 import authentication from "../middlewares/authentication.js";
+import Session from "../models/session.js";
+import User from "../models/user.js";
+import { SESSION_COOKIE_NAME, hashSessionToken } from "../services/session.js";
 
-const request = (authorization?: string) => ({
-  headers: authorization ? { authorization } : {},
+const token = "ab".repeat(32);
+
+const request = (cookie?: unknown) => ({
+  cookies: cookie === undefined ? {} : { [SESSION_COOKIE_NAME]: cookie },
 }) as Request;
 
 const response = () => {
   const result = {
     statusCode: 200,
     body: undefined as unknown,
+    cleared: [] as unknown[][],
     status(code: number) { result.statusCode = code; return result; },
     json(body: unknown) { result.body = body; return result; },
+    clearCookie(...args: unknown[]) { result.cleared.push(args); return result; },
   };
-  return result as unknown as Response & { statusCode: number; body: unknown };
+  return result as unknown as Response & typeof result;
 };
 
-const nextCounter = () => {
+const nextCapture = () => {
   let calls = 0;
-  return { next: (() => { calls += 1; }) as NextFunction, calls: () => calls };
+  let received: unknown;
+  return {
+    next: ((error?: unknown) => { calls += 1; received = error; }) as NextFunction,
+    calls: () => calls,
+    error: () => received,
+  };
 };
 
 afterEach(() => mock.restoreAll());
 
-test("continues anonymous requests without setting a user", async () => {
-  const req = request();
-  const res = response();
-  const counter = nextCounter();
-  await authentication(req, res, counter.next);
-  assert.equal(counter.calls(), 1);
-  assert.equal(req.userId, undefined);
-});
+test("an active session authenticates the request", async () => {
+  const expiresAt = new Date(Date.now() + 60_000);
+  mock.method(Session, "findOne", async () => ({
+    userId: "507f1f77bcf86cd799439011",
+    csrfToken: "csrf-token",
+    expiresAt,
+  }));
+  mock.method(User, "exists", async () => ({ _id: "507f1f77bcf86cd799439011" }));
+  const req = request(token);
+  const counter = nextCapture();
 
-test("sets userId from an object JWT payload", async () => {
-  mock.method(jwt, "verify", () => ({ uid: "user-123" }));
-  const req = request("Bearer token");
-  const counter = nextCounter();
   await authentication(req, response(), counter.next);
+
   assert.equal(counter.calls(), 1);
-  assert.equal(req.userId, "user-123");
+  assert.equal(counter.error(), undefined);
+  assert.equal(req.userId, "507f1f77bcf86cd799439011");
+  assert.deepEqual(req.authSession, {
+    token,
+    csrfToken: "csrf-token",
+    expiresAt,
+  });
 });
 
-test("ignores decoded JWT strings or payloads without uid", async () => {
-  for (const decoded of ["payload", {}]) {
-    mock.method(jwt, "verify", () => decoded);
-    const req = request("Bearer token");
-    const counter = nextCounter();
-    await authentication(req, response(), counter.next);
-    assert.equal(counter.calls(), 1);
-    assert.equal(req.userId, undefined);
-    mock.restoreAll();
+test("missing and malformed cookies return 401 and clear the session cookie", async () => {
+  let queries = 0;
+  mock.method(Session, "findOne", async () => {
+    queries += 1;
+    return null;
+  });
+
+  for (const cookie of [undefined, "malformed"]) {
+    const res = response();
+    const counter = nextCapture();
+    await authentication(request(cookie), res, counter.next);
+    assert.equal(counter.calls(), 0);
+    assert.equal(res.statusCode, 401);
+    assert.deepEqual(res.body, {
+      message: "Sign in required.",
+      code: "UNAUTHENTICATED",
+    });
+    assert.equal(res.cleared[0]?.[0], SESSION_COOKIE_NAME);
   }
+  assert.equal(queries, 0);
 });
 
-test("returns the existing 403 response for invalid tokens", async () => {
-  mock.method(console, "log", () => {});
-  mock.method(jwt, "verify", () => { throw new Error("invalid"); });
-  const req = request("Bearer token");
+test("expired sessions return 401 without exposing lookup details", async () => {
+  let lookup: unknown;
+  mock.method(Session, "findOne", async (filter: unknown) => {
+    lookup = filter;
+    return null;
+  });
   const res = response();
-  const counter = nextCounter();
-  await authentication(req, res, counter.next);
-  assert.equal(counter.calls(), 0);
-  assert.equal(res.statusCode, 403);
-  assert.deepEqual(res.body, { message: "Invalid token" });
+
+  await authentication(request(token), res, nextCapture().next);
+
+  assert.equal(res.statusCode, 401);
+  assert.equal((res.body as { code: string }).code, "UNAUTHENTICATED");
+  assert.deepEqual((lookup as { tokenHash: string }).tokenHash, hashSessionToken(token));
+  assert.ok((lookup as { expiresAt: { $gt: unknown } }).expiresAt.$gt instanceof Date);
+});
+
+test("orphaned sessions are deleted and rejected", async () => {
+  mock.method(Session, "findOne", async () => ({
+    userId: "507f1f77bcf86cd799439099",
+    csrfToken: "csrf-token",
+    expiresAt: new Date(Date.now() + 60_000),
+  }));
+  mock.method(User, "exists", async () => null);
+  let deleted: unknown;
+  mock.method(Session, "deleteOne", async (filter: unknown) => {
+    deleted = filter;
+    return { deletedCount: 1 };
+  });
+  const res = response();
+
+  await authentication(request(token), res, nextCapture().next);
+
+  assert.equal(res.statusCode, 401);
+  assert.deepEqual(deleted, { tokenHash: hashSessionToken(token) });
+  assert.equal(res.cleared[0]?.[0], SESSION_COOKIE_NAME);
+});
+
+test("unexpected authentication failures are forwarded without leaking details", async () => {
+  const failure = new Error("database password appeared here");
+  mock.method(Session, "findOne", async () => { throw failure; });
+  const res = response();
+  const capture = nextCapture();
+
+  await authentication(request(token), res, capture.next);
+
+  assert.equal(capture.error(), failure);
+  assert.equal(res.body, undefined);
 });

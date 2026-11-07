@@ -1,8 +1,11 @@
-import allowedOrigins from "./allowedOrigins.js"
 import type { CorsOptions } from "cors";
+import { getAllowedOrigins } from "./allowedOrigins.js";
 
 const corsOptions: CorsOptions = {
-  origin: allowedOrigins
-  };
+  credentials: true,
+  origin(origin, callback) {
+    callback(null, !origin || getAllowedOrigins().includes(origin));
+  },
+};
 
-export default corsOptions
+export default corsOptions;

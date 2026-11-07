@@ -4,6 +4,7 @@ export class HttpError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "HttpError";
@@ -43,5 +44,8 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, next) => {
       ? error.message
       : "Something went wrong.";
 
-  res.status(status).json({ message });
+  res.status(status).json({
+    message,
+    ...(error instanceof HttpError && error.code ? { code: error.code } : {}),
+  });
 };
